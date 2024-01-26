@@ -30,6 +30,7 @@
 
 from PIL import Image, ImageEnhance
 import pytesseract
+import shutil
 import pandas as pd
 import cv2
 import os
@@ -50,7 +51,7 @@ from cfg.cfg import *
 pytesseract.pytesseract.tesseract_cmd = r'd:\SoftWare\Tesseract-OCR\tesseract.exe'
 
 
-def ocr_text_of_frame(frame_path: Path) -> dict:
+def ocr_text_of_frame(frame_path: str) -> dict:
     img = Image.open(frame_path)
     # img.show()
 
@@ -66,7 +67,7 @@ def ocr_text_of_frame(frame_path: Path) -> dict:
         text = pytesseract.image_to_string(img_contrast,
                                            # lang='chi_sim',
                                            timeout=0.5,
-                                           # config=custom_config,
+                                           config=custom_config,
                                            )
 
         # 使用正则表达式提取日期时间信息
@@ -91,6 +92,7 @@ def ocr_text_of_frame(frame_path: Path) -> dict:
             "timestamp": timestamp,
             "pic index": pic_idx,
             "text": text,
+            "frame_path": frame_path,
         }
     except RuntimeError as timeout_error:
         # Tesseract processing is terminated
@@ -99,6 +101,7 @@ def ocr_text_of_frame(frame_path: Path) -> dict:
             "timestamp": None,
             "pic index": None,
             "text": None,
+            "frame_path": frame_path,
         }
 
 
@@ -106,6 +109,8 @@ def split_video_to_frames(video_path: str, output_folder: Path) -> tuple:
     # 打开视频文件
     cap = cv2.VideoCapture(video_path)
 
+    # 清空文件夹
+    shutil.rmtree(output_folder, ignore_errors=True)
     # 创建输出文件夹
     os.makedirs(output_folder, exist_ok=True)
 
