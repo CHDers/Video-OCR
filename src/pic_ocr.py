@@ -53,26 +53,36 @@ pytesseract.pytesseract.tesseract_cmd = r'd:\SoftWare\Tesseract-OCR\tesseract.ex
 
 def ocr_text_of_frame(frame_path: str) -> dict:
     img = Image.open(frame_path)
+    width, height = img.size
     # img.show()
+
+    # 图片裁剪
+    pic_idx_image_box = (1980,0,2140,18) # 将要裁剪的图片块距原图左边界距左边距离，上边界距上边距离，右边界距左边距离，下边界距上边的距离。
+    pic_idx_crop_img = img.crop(pic_idx_image_box)
+    # time_box = (238,0,395,18)
+    # time_crop_img = img.crop(time_box)
+    # time_crop_img.show()
 
     # 增强图片对比度
     enhancer = ImageEnhance.Contrast(img)
     img_contrast = enhancer.enhance(2.0)
+    pic_idx_enhancer = ImageEnhance.Contrast(pic_idx_crop_img)
+    pic_idx_img_contrast = pic_idx_enhancer.enhance(2.0)
 
     # 指定配置，开启多列文字处理
     custom_config = r'--oem 3 --psm 6'
 
     """🐱‍👓识别超时就停止"""
     try:
-        text = pytesseract.image_to_string(img_contrast,
+        all_text = pytesseract.image_to_string(img_contrast,
                                            # lang='chi_sim',
                                            timeout=0.5,
-                                           config=custom_config,
+                                        #    config=custom_config,
                                            )
 
         # 使用正则表达式提取日期时间信息
-        time_match = re.search(r'\((.*?) UTC\)', text)
-        time_match_ = re.search(r'\((.*?) UTO\)', text)
+        time_match = re.search(r'\((.*?) UTC\)', all_text)
+        time_match_ = re.search(r'\((.*?) UTO\)', all_text)
         if time_match:
             timestamp = time_match.group(1)
         else:
@@ -83,15 +93,24 @@ def ocr_text_of_frame(frame_path: str) -> dict:
 
         # 使用正则表达式提取 "Current Image: 48 / 1381"
         # pic_idx_match = re.search(r'Current Image: (\d+/\d+)', text)
-        pic_idx_match = re.search(r'Current Image: (.+?) \| L/R Keyframes', text)
+        pic_idx_match = re.search(r'Current Image: (.+?) \| L/R Keyframes', all_text)
         if pic_idx_match:
             pic_idx = pic_idx_match.group(1)
         else:
-            pic_idx = None
+            pic_idx_text = pytesseract.image_to_string(pic_idx_img_contrast,
+                                           # lang='chi_sim',
+                                           timeout=0.5,
+                                        #    config=custom_config,
+                                           )
+            second_ocr_pic_idx_match = re.search(r'Current Image: (.+?)', pic_idx_text)
+            if second_ocr_pic_idx_match:
+                pic_idx = second_ocr_pic_idx_match.group(1)
+            else:
+                pic_idx = None
         return {
             "timestamp": timestamp,
             "pic index": pic_idx,
-            "text": text,
+            "text": all_text,
             "frame_path": frame_path,
         }
     except RuntimeError as timeout_error:
