@@ -32,20 +32,20 @@ from src.pic_ocr import ocr_text_of_frame, split_video_to_frames
 
 
 def main(is_multiprocessing: bool = False) -> None:
-    video_path = FILE_ROOT / "video.mp4"
+    video_path = FILE_ROOT / "093318_area_1.mp4"
     frames_path = FIGURE_PATH / "Frames"
 
     # 视频 --> 一帧一帧照片
-    frame_filename_list, _ = split_video_to_frames(video_path=str(video_path), output_folder=frames_path)
-    # frame_filename_list = glob.glob(str(frames_path) + "/*")
+    # frame_filename_list, _ = split_video_to_frames(video_path=str(video_path), output_folder=frames_path)
+    frame_filename_list = glob.glob(str(frames_path) + "/*")
 
     # 识别每祯视频的文字
     if is_multiprocessing:
         # SECTION: 多线程
         #  (https://www.cnblogs.com/azureology/p/13212723.html)
         #  (https://cloud.tencent.com/developer/article/1888969)
-        print(f"[bold green]多线程识别中...cpu_count: {cpu_count()}[/bold green]")
-        with Pool(int(cpu_count() / 2)) as pool:
+        print(f"[bold green]Multiprocessing --> cpu_count: {cpu_count()}[/bold green]")
+        with Pool(int(cpu_count() / 3)) as pool:
             ocr_list = list(
                 tqdm(pool.imap(ocr_text_of_frame, frame_filename_list), total=len(frame_filename_list)))
             # ocr_list = pool.map(ocr_text_of_frame, frame_filename_list[::2])
@@ -78,7 +78,7 @@ def main(is_multiprocessing: bool = False) -> None:
     ocr_df.drop_duplicates(subset=['timestamp', 'pic index'], keep='first', inplace=True)
 
     ocr_df['timestamp'] = pd.to_datetime(ocr_df['timestamp'], format='%Y-%m-%d-%H:%M:%S', errors='ignore')
-    ocr_df.to_csv(RESULT_PATH / "ocr_result.csv", index=False, encoding='utf-8-sig')
+    ocr_df.to_csv(RESULT_PATH / f"{video_path.stem}_ocr_result.csv", index=False, encoding='utf-8-sig')
 
     print("🚀🚀🚀 [italic bold green]Code Ending")
 
