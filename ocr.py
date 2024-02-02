@@ -28,16 +28,18 @@ if str(ROOT_0) not in sys.path:
 if str(ROOT_1) not in sys.path:
     sys.path.append(str(ROOT_1))  # add ROOT to PATH
 from cfg.cfg import *
-from src.pic_ocr import ocr_text_of_frame, split_video_to_frames
+from src.pic_ocr import ocr_text_of_frame_by_pytesseract, split_video_to_frames, ocr_text_of_frame_by_paddleocr
+import warnings
+warnings.filterwarnings("ignore")
 
 
 def main(is_multiprocessing: bool = False) -> None:
-    video_path = FILE_ROOT / "093318_area_1.mp4"
+    video_path = FILE_ROOT / "video.mp4"
     frames_path = FIGURE_PATH / "Frames"
 
     # 视频 --> 一帧一帧照片
-    # frame_filename_list, _ = split_video_to_frames(video_path=str(video_path), output_folder=frames_path)
-    frame_filename_list = glob.glob(str(frames_path) + "/*")
+    frame_filename_list, _ = split_video_to_frames(video_path=str(video_path), output_folder=frames_path)
+    # frame_filename_list = glob.glob(str(frames_path) + "/*")
 
     # 识别每祯视频的文字
     if is_multiprocessing:
@@ -47,7 +49,7 @@ def main(is_multiprocessing: bool = False) -> None:
         print(f"[bold green]Multiprocessing --> cpu_count: {cpu_count()}[/bold green]")
         with Pool(int(cpu_count() / 3)) as pool:
             ocr_list = list(
-                tqdm(pool.imap(ocr_text_of_frame, frame_filename_list), total=len(frame_filename_list)))
+                tqdm(pool.imap(ocr_text_of_frame_by_pytesseract, frame_filename_list), total=len(frame_filename_list)))
             # ocr_list = pool.map(ocr_text_of_frame, frame_filename_list[::2])
 
         # thread_pool = Pool(int(cpu_count() / 2))
@@ -57,9 +59,9 @@ def main(is_multiprocessing: bool = False) -> None:
     else:
         # SECTION: 单线程
         ocr_list = []
-        for frame_filename_idx in tqdm(range(len(frame_filename_list)), desc=f"OCR", postfix=f"OCR Model",
+        for frame_filename_idx in tqdm(range(len(frame_filename_list[:10])), desc=f"OCR", postfix=f"OCR Model",
                                        colour="green"):
-            ocr_list.append(ocr_text_of_frame(frame_path=frame_filename_list[frame_filename_idx]))
+            ocr_list.append(ocr_text_of_frame_by_pytesseract(frame_path=frame_filename_list[frame_filename_idx]))
 
     ocr_df = pd.DataFrame(ocr_list)
 
@@ -84,4 +86,4 @@ def main(is_multiprocessing: bool = False) -> None:
 
 
 if __name__ == '__main__':
-    main(is_multiprocessing=True)
+    main(is_multiprocessing=False)

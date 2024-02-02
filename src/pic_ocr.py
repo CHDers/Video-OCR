@@ -28,8 +28,10 @@
 # https://blog.csdn.net/qq_38563206/article/details/132990793
 
 
+from cfg.cfg import *
 from PIL import Image, ImageEnhance
 import pytesseract
+from paddleocr import PaddleOCR
 import shutil
 import pandas as pd
 import cv2
@@ -46,18 +48,63 @@ if str(ROOT_0) not in sys.path:
     sys.path.append(str(ROOT_0))  # add ROOT to PATH
 if str(ROOT_1) not in sys.path:
     sys.path.append(str(ROOT_1))  # add ROOT to PATH
-from cfg.cfg import *
 
 pytesseract.pytesseract.tesseract_cmd = r'd:\SoftWare\Tesseract-OCR\tesseract.exe'
 
 
-def ocr_text_of_frame(frame_path: str) -> dict:
+def ocr_text_of_frame_by_paddleocr(frame_path: str) -> dict:
+    ocr = PaddleOCR(lang='ch')
+
+    """🐱‍👓识别超时就停止"""
+    try:
+        ocr_result_list = ocr.ocr(frame_path)
+        # print(ocr_result_list)
+
+        # 使用正则表达式提取日期时间信息
+        time_match = re.search(r'\((.*?) UTC\)', ocr_result_list[0])
+        time_match_ = re.search(r'\((.*?) UTO\)', ocr_result_list[0])
+        if time_match:
+            timestamp = time_match.group(1)
+        else:
+            if time_match_:
+                timestamp = time_match_.group(1)
+            else:
+                timestamp = None
+
+        # 使用正则表达式提取 "Current Image: 48 / 1381"
+        # pic_idx_match = re.search(r'Current Image: (\d+/\d+)', text)
+        pic_idx_match = re.search(
+            r'Current Image: (.+?) \| L/R Keyframes', ocr_result_list[-1])
+        if pic_idx_match:
+            pic_idx = pic_idx_match.group(1)
+        else:
+            pic_idx = None
+        return {
+            "timestamp": timestamp,
+            "pic index": pic_idx,
+            "text": ocr_result_list,
+            "frame_path": frame_path,
+        }
+
+    except RuntimeError as timeout_error:
+        # Tesseract processing is terminated
+        print(f"🤗🤗🤗 [italic bold red]OCR ERROR: {frame_path}")
+        return {
+            "timestamp": None,
+            "pic index": None,
+            "text": None,
+            "frame_path": frame_path,
+        }
+
+
+def ocr_text_of_frame_by_pytesseract(frame_path: str) -> dict:
     img = Image.open(frame_path)
     width, height = img.size
     # img.show()
 
     # 图片裁剪
-    pic_idx_image_box = (1980,0,2140,18) # 将要裁剪的图片块距原图左边界距左边距离，上边界距上边距离，右边界距左边距离，下边界距上边的距离。
+    # 将要裁剪的图片块距原图左边界距左边距离，上边界距上边距离，右边界距左边距离，下边界距上边的距离。
+    pic_idx_image_box = (1980, 0, 2140, 18)
     pic_idx_crop_img = img.crop(pic_idx_image_box)
     # time_box = (238,0,395,18)
     # time_crop_img = img.crop(time_box)
@@ -75,10 +122,10 @@ def ocr_text_of_frame(frame_path: str) -> dict:
     """🐱‍👓识别超时就停止"""
     try:
         all_text = pytesseract.image_to_string(img_contrast,
-                                           # lang='chi_sim',
-                                           timeout=0.5,
-                                        #    config=custom_config,
-                                           )
+                                               # lang='chi_sim',
+                                               timeout=0.5,
+                                               #    config=custom_config,
+                                               )
 
         # 使用正则表达式提取日期时间信息
         time_match = re.search(r'\((.*?) UTC\)', all_text)
@@ -93,16 +140,18 @@ def ocr_text_of_frame(frame_path: str) -> dict:
 
         # 使用正则表达式提取 "Current Image: 48 / 1381"
         # pic_idx_match = re.search(r'Current Image: (\d+/\d+)', text)
-        pic_idx_match = re.search(r'Current Image: (.+?) \| L/R Keyframes', all_text)
+        pic_idx_match = re.search(
+            r'Current Image: (.+?) \| L/R Keyframes', all_text)
         if pic_idx_match:
             pic_idx = pic_idx_match.group(1)
         else:
             pic_idx_text = pytesseract.image_to_string(pic_idx_img_contrast,
-                                           # lang='chi_sim',
-                                           timeout=0.5,
-                                        #    config=custom_config,
-                                           )
-            second_ocr_pic_idx_match = re.search(r'Current Image: (.+?)', pic_idx_text)
+                                                       # lang='chi_sim',
+                                                       timeout=0.5,
+                                                       #    config=custom_config,
+                                                       )
+            second_ocr_pic_idx_match = re.search(
+                r'Current Image: (.+?)', pic_idx_text)
             if second_ocr_pic_idx_match:
                 pic_idx = second_ocr_pic_idx_match.group(1)
             else:
@@ -147,7 +196,8 @@ def split_video_to_frames(video_path: str, output_folder: Path) -> tuple:
             break
 
         # 保存每一帧为图像文件
-        frame_filename = os.path.join(output_folder, f"frame_{frame_count:04d}.jpg")
+        frame_filename = os.path.join(
+            output_folder, f"frame_{frame_count:04d}.jpg")
         cv2.imwrite(frame_filename, frame)
         frame_filename_list.append(frame_filename)
 
